@@ -19,3 +19,4 @@ yarl
 python-decouple
 dependency-injector
 pika
+pydantic
