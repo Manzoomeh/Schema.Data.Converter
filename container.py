@@ -1,6 +1,6 @@
 from dependency_injector.containers import DeclarativeContainer
 from dependency_injector.providers import Configuration, FactoryAggregate, Factory, Singleton
-from providers import ProviderType, IProvider, ExcelProvider, SqlProvider
+from providers import ProviderType, IProvider, ExcelProvider, SqlProvider, ApiProvider
 from models.schema import SchemaRepository
 
 
@@ -14,7 +14,10 @@ class Container(DeclarativeContainer):
             ),
             ProviderType.SQL.value.lower(): Factory(
                 SqlProvider
-            )
+            ),
+            ProviderType.API.value.lower(): Factory(
+                ApiProvider
+            ),
         }
     )
     

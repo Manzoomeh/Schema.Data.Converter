@@ -1,12 +1,10 @@
 from typing import Dict, List, Union, Tuple
 from models.object import ObjectProperties, ObjectPrpValue, ObjectValue
 from models.schema import Schema
-from models.rkey import RkeyContext
 from .interface import IProvider, ProviderError
 from pydantic import BaseModel, field_validator, model_validator, ConfigDict
 from pathlib import Path
 import pandas
-from bclib.parser import Answer
 
 class ExcelExportData(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -62,13 +60,13 @@ class ExcelProvider(IProvider[ExcelImportData, ExcelExportData]):
     def _create_import_data(self, data: Dict) -> ExcelImportData:
         return ExcelImportData(**data)
     
-    async def _import_schema_async(self, rkey_context: RkeyContext, answers: List[Answer], import_data: ExcelImportData):
-        return await super()._import_schema_async(rkey_context, answers, import_data)
+    async def _import_schema_async(self, properties: List[ObjectProperties], import_data: ExcelImportData):
+        return await super()._import_schema_async(properties, import_data)
     
-    def _export_schema(self, export_data: ExcelExportData) -> List[Answer]:
+    def _export_schema(self, export_data: ExcelExportData) -> List[ObjectProperties]:
         headers = export_data.headers
         headers_count = len(headers)
-        df = pandas.read_excel(io=export_data.io, header=list(range(headers_count)))
+        df = pandas.read_excel(io=export_data.io, header=list(range(headers_count)), dtype=pandas.StringDtype.name)
         columns: List[Union[str, Tuple[str]]] = df.columns
         raw_columns: List[str] = list()
         if ExcelProvider.ROW_NUMBER not in columns[0]:
@@ -123,15 +121,7 @@ class ExcelProvider(IProvider[ExcelImportData, ExcelExportData]):
             except Exception as ex:
                 print(f"[Warning] row={index} has error! Info: {str(ex)}")
 
-        return [
-            Answer(
-                data={
-                    "properties": list(item.data.values())
-                },
-                api_url=self._schema_url
-            )
-            for item in list(objects_properties.values())
-        ]
+        return list(objects_properties.values())
 
     def __get_named_col(self, col_data: Dict):
         for prpid, prp in self._properties.items():

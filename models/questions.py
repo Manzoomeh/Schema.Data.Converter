@@ -1,5 +1,5 @@
 from typing import List, Optional, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from enum import Enum
 
 class DataType(Enum):
@@ -12,13 +12,15 @@ class DataType(Enum):
     FILE_VALUE = "filevalue"
     REFERENCE = "reference"
 
-class FixValue:
+class FixValue(BaseModel):
     id: int
     value: Any
 
 class Part(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     caption: Optional[str]
-    datatype: DataType
+    datatype: Optional[DataType]
     fixvalues: Optional[List[FixValue]]
 
     Id: int

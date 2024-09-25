@@ -18,3 +18,4 @@ tzdata
 yarl
 python-decouple
 dependency-injector
+pika

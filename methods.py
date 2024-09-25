@@ -1,24 +1,17 @@
 from bclib.edge import RESTfulContext, HttpStatusCodes, DictEx, BadRequestErr
 from dependency_injector.wiring import inject, Provider, Provide
 from dependency_injector.errors import NoSuchProviderError
-from typing import Callable, List
+from typing import Callable, List, Union, Dict
 from providers.interface import IProvider, ProviderError
 from providers.types import ProviderType
 from models.schema import SchemaRepository
 from models.questions import Property
-from models.rkey import RkeyContext
-
 
 @inject
 async def import_async(context: RESTfulContext, provider_factory: Callable[[str, List[Property]], IProvider] = Provider["provider_factory"], schema_repository: SchemaRepository = Provide["schema_repo"]):
     try:
         body = context.body or DictEx()
-        rkey_content = body.get("rkeyContent")
-        if rkey_content is None:
-            raise BadRequestErr("'rkeyContent' not found in body")
-        if not isinstance(rkey_content, dict):
-            raise BadRequestErr("Invalid rkeyContent datatype")
-        rkey_context = RkeyContext(**rkey_content)
+        
         schema_url = body.get("schemaUrl")
         if schema_url is None:
             raise BadRequestErr("'schemaUrl' not found in body")
@@ -29,11 +22,12 @@ async def import_async(context: RESTfulContext, provider_factory: Callable[[str,
         except Exception as ex:
             print(repr(ex))
             raise ValueError("Invalid schemaUrl")
-        source_data = body.get("sourceData")
+        
+        source_data = body.get("source")
         if source_data is None:
-            raise BadRequestErr("'sourceData' not found in body")
+            raise BadRequestErr("'source' not found in body")
         if not isinstance(source_data, dict):
-            raise BadRequestErr("Invalid sourceData datatype in body")
+            raise BadRequestErr("Invalid source datatype in body")
         source_type = source_data.get("type")
         if not isinstance(source_type, str):
             raise BadRequestErr("Invalid sourceType datatype")
@@ -44,25 +38,49 @@ async def import_async(context: RESTfulContext, provider_factory: Callable[[str,
         except Exception as ex:
             raise BadRequestErr(str(ex))
         
-        dest_data = body.get("destinationData")
-        if dest_data is None:
-            raise BadRequestErr("'destinationData' not found in body")
-        if not isinstance(dest_data, dict):
-            raise BadRequestErr("Invalid destinationData type in body")
-        dest_type = dest_data.get("type")
-        if not isinstance(dest_type, str) or dest_type != ProviderType.SQL.value:
-            raise BadRequestErr("Invalid destinationType datatype")
-        try:
-            dest_provider = provider_factory(dest_type.lower(), schema)
-        except NoSuchProviderError as ex:
-            raise BadRequestErr(f"Invalid provider type '{dest_type}'")
-        except Exception as ex:
-            raise BadRequestErr(str(ex))
+        destinations = body.get("destinations")
+        if destinations is None:
+            raise BadRequestErr("'destinations' not found in body")
+        if not isinstance(destinations, list):
+            raise BadRequestErr("Invalid destinations type in body")
+        destination_obejcts: Dict[str, Dict[str, Union[IProvider, Dict]]] = dict()
+        for index, dest_data in enumerate(destinations):
+            if not isinstance(dest_data, dict):
+                raise Exception(f"Invalid destinationData at index={index}")
+            name = dest_data.get("name", f"Destination_{index}")
+            if not isinstance(name, str):
+                raise Exception(f"Invalid destination name type at index={index}")
+            if name in destination_obejcts:
+                raise Exception(f"Repetetive name={name}")
+            dest_type = dest_data.get("type")
+            if not isinstance(dest_type, str):
+                raise BadRequestErr("Invalid destinationType datatype")
+            try:
+                dest_provider = provider_factory(dest_type.lower(), schema)
+            except NoSuchProviderError as ex:
+                raise BadRequestErr(f"Invalid provider type '{dest_type}'")
+            except Exception as ex:
+                raise BadRequestErr(str(ex))
+            destination_obejcts[name] = {
+                "obj": dest_provider,
+                "data": dest_data
+            }
         try:
             answers = source_provider.export_schema(source_data)
         except ProviderError as ex:
             raise BadRequestErr(message=repr(ex))
-        result = await dest_provider.import_schema_async(rkey_context, answers, dest_data)
+        result = list()
+        for name, dest_obj in destination_obejcts.items():
+            dest_provider = dest_obj["obj"]
+            dest_data = dest_obj["data"]
+            resp = await dest_provider.import_schema_async(answers, dest_data) or {
+                "errorid": 5,
+                "message": "successful"
+            }
+            result.append({
+                "name": name,
+                "response": resp
+            })
     except BadRequestErr as ex:
         print(str(ex))
         context.status_code = HttpStatusCodes.BAD_REQUEST

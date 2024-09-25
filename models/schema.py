@@ -1,12 +1,14 @@
 from typing import Dict, Any, List, Optional
-from models.questions import Property, Part, DataType
+from models.questions import Property, Part, DataType, FixValue
 import aiohttp
 from dataclasses import dataclass
 
 @dataclass
 class Schema:
     url: str
+    paramUrl: str
     hashid: str
+    version: str
     properties: Dict[int, Property]
 
 class SchemaRepository:
@@ -43,7 +45,7 @@ class SchemaRepository:
             result = DataType.FILE_VALUE
         elif view_type == "color":
             result = DataType.TEXT_VALUE
-        elif view_type == "reference":
+        elif view_type in ("reference", "simpleautocomplete"):
             result = DataType.REFERENCE
         return result
 
@@ -55,6 +57,8 @@ class SchemaRepository:
             raise Exception("Invalid schemaUrl")
         schema_data = resp["sources"][0]["data"][0]
         hashid = schema_data["schemaId"]
+        param_url = schema_data["paramUrl"]
+        version = schema_data["schemaVersion"]
         questions: List[Dict] = schema_data.get("questions", list())
         sections: List[Dict] = schema_data.get("sections", list())
 
@@ -65,18 +69,22 @@ class SchemaRepository:
             multi = bool(q.get("multi", False))
             parts = list()
             q_parts: List[Dict] = q.get("parts", list())
-            view_type = q["viewType"]
             for p in q_parts:
+                view_type = p["viewType"]
                 part_id = int(p["part"])
                 data_type = self.__set_datatype(view_type, p.get("validations"))
                 if data_type is None:
                     print("[Warning]", f"Datatype not set for prpId={prp_id} and partId={part_id}")
+                fix_values = p.get("fixValues", list())
                 parts.append(
                     Part(
                         caption=p.get("caption"),
                         Id=part_id,
                         datatype=data_type,
-                        fixvalues=p.get("fixValues")
+                        fixvalues=[
+                            FixValue(**item)
+                            for item in fix_values
+                        ]
                     )
                 )
             if section is not None:
@@ -91,6 +99,8 @@ class SchemaRepository:
             )
         return Schema(
             url=url,
+            paramUrl=param_url,
+            version=version,
             hashid=hashid,
             properties=properties
         )
