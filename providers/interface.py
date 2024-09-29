@@ -26,13 +26,13 @@ class IProvider(Generic[IMPORT_DATA, EXPORT_DATA]):
     def _create_import_data(self, data: Dict) -> IMPORT_DATA: ...
     
     @abstractmethod
-    def _export_schema(self, export_data: EXPORT_DATA) -> List[ObjectProperties]: ...
+    def _export_schema_async(self, export_data: EXPORT_DATA) -> List[ObjectProperties]: ...
 
     @abstractmethod
     async def _import_schema_async(self, properties: List[ObjectProperties], import_data: IMPORT_DATA): ...
 
-    def export_schema(self, data: Dict) -> List[ObjectProperties]:
-        return self._export_schema(
+    async def export_schema(self, data: Dict) -> List[ObjectProperties]:
+        return await self._export_schema_async(
             self._create_export_data(data)
         )
     

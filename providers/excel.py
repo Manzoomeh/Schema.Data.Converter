@@ -63,7 +63,7 @@ class ExcelProvider(IProvider[ExcelImportData, ExcelExportData]):
     async def _import_schema_async(self, properties: List[ObjectProperties], import_data: ExcelImportData):
         return await super()._import_schema_async(properties, import_data)
     
-    def _export_schema(self, export_data: ExcelExportData) -> List[ObjectProperties]:
+    async def _export_schema_async(self, export_data: ExcelExportData) -> List[ObjectProperties]:
         headers = export_data.headers
         headers_count = len(headers)
         df = pandas.read_excel(io=export_data.io, header=list(range(headers_count)), dtype=pandas.StringDtype.name)
@@ -117,7 +117,7 @@ class ExcelProvider(IProvider[ExcelImportData, ExcelExportData]):
                         )
                     )
             try:
-                objects_properties[selected_id].add_prpvalue(list(prpvalues.values()))
+                await objects_properties[selected_id].add_prpvalue_async(list(prpvalues.values()))
             except Exception as ex:
                 print(f"[Warning] row={index} has error! Info: {str(ex)}")
 

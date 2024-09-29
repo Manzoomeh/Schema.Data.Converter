@@ -1,6 +1,19 @@
-from typing import Any, List
+from typing import Any, List, Dict
 from pydantic import BaseModel, ConfigDict
-from models.questions import Property, DataType
+from models.questions import Property, DataType, Part
+import aiohttp
+
+async def get_autocomplete_id_async(link: str, term: Any):
+    url = link.replace("${term}", term)
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as req:
+            resp = await req.json()
+    if not isinstance(resp, list):
+        resp = list()
+    for item in resp:
+        if item["value"] == term:
+            return int(item["id"])
+
 
 class ObjectValue(BaseModel):
     part: int
@@ -15,8 +28,9 @@ class ObjectPrpValue(BaseModel):
 class ObjectProperties:
     def __init__(self) -> None:
         self.data = dict()
+        self.__autocomplete_repo: Dict[Part, Dict[str, int]] = dict()
 
-    def add_prpvalue(self, prpvalues: List[ObjectPrpValue]):
+    async def add_prpvalue_async(self, prpvalues: List[ObjectPrpValue]):
         for prpvalue in prpvalues:
             prp = prpvalue.prp
             prpid = prp.Id
@@ -42,10 +56,19 @@ class ObjectProperties:
                             selected_id = item.id
                             break
                     if selected_id is None:
-                        raise Exception(f"Invalid value for prpId={input_part} and part={prpid}. Info: [value='{input_value}' not found in fixvalues]")
+                        raise Exception(f"Invalid value for prpId={prpid} and part={input_part}. Info: [value='{input_value}' not found in fixvalues]")
                     input_value = selected_id
-                elif part_datatype in (DataType.REFERENCE, DataType.URL_VALUE):
-                    raise NotImplementedError(f"datatype={part_datatype.value} not implemented yet")
+                elif part_datatype in (DataType.URL_VALUE):
+                    # GET FROM LINK ( --- DEPENDENCIES ???)
+                    if selected_part not in self.__autocomplete_repo:
+                        self.__autocomplete_repo[selected_part] = dict()
+                    part_repo = self.__autocomplete_repo[selected_part]
+                    if input_value not in part_repo:
+                        autocomplete_id = await get_autocomplete_id_async(selected_part.link, input_value)
+                        if autocomplete_id is None:
+                            raise Exception(f"Invalid value for prpId={prpid} and part={input_part}. Info: [value='{input_value}' not found in autocomplete]")
+                        part_repo[input_value] = autocomplete_id
+                    input_value = part_repo[input_value]
                 added_parts.append({
                     "part": input_part,
                     "values": [

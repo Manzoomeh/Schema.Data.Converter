@@ -21,6 +21,7 @@ class Part(BaseModel):
 
     caption: Optional[str]
     datatype: Optional[DataType]
+    link: str
     fixvalues: Optional[List[FixValue]]
 
     Id: int
@@ -32,3 +33,7 @@ class Property(BaseModel):
     Id: int
 
     parts: List[Part]
+
+class Section(BaseModel):
+    Id: int
+    title: str

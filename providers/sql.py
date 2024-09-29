@@ -22,6 +22,6 @@ class SqlProvider(IProvider[SqlImportData, SqlExportData]):
     async def _import_schema_async(self, properties: List[ObjectProperties], import_data: SqlImportData):
         return await super()._import_schema_async(properties, import_data)
     
-    def _export_schema(self, export_data: SqlExportData) -> List[ObjectProperties]:
-        return super()._export_schema(export_data)
+    async def _export_schema_async(self, export_data: SqlExportData) -> List[ObjectProperties]:
+        return await super()._export_schema_async(export_data)
     

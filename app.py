@@ -51,7 +51,8 @@ async def initialize_container_async():
     await container.init_resources()
 
 @app.restful_action(
-    app.url("import")
+    app.url(":rkey/:culture/import"),
+    app.callback(check_rkey_async)
 )
 async def import_handler_async(context: edge.RESTfulContext):
     return await import_async(context)

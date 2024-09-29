@@ -1,4 +1,4 @@
-from bclib.edge import RESTfulContext, HttpStatusCodes, DictEx, BadRequestErr
+from bclib.edge import RESTfulContext, HttpStatusCodes, DictEx, BadRequestErr, UnauthorizedErr
 from dependency_injector.wiring import inject, Provider, Provide
 from dependency_injector.errors import NoSuchProviderError
 from typing import Callable, List, Union, Dict
@@ -6,6 +6,21 @@ from providers.interface import IProvider, ProviderError
 from providers.types import ProviderType
 from models.schema import SchemaRepository
 from models.questions import Property
+
+async def check_rkey_async(context: RESTfulContext):
+    rest_api = context.open_restful_connection("check_rkey")
+    with rest_api:
+        checked = await rest_api.get_async(f"/{context.url_segments.rkey}")
+    if not isinstance(checked, dict):
+        checked = dict()
+    status = bool(checked.get("checked") == True)
+    if status:
+        context.check_rkey = DictEx(checked)
+    else:
+        raise UnauthorizedErr(data={
+            "errorid": 1,
+            "message": "Invalid rkey!"
+        })
 
 @inject
 async def import_async(context: RESTfulContext, provider_factory: Callable[[str, List[Property]], IProvider] = Provider["provider_factory"], schema_repository: SchemaRepository = Provide["schema_repo"]):
@@ -18,7 +33,10 @@ async def import_async(context: RESTfulContext, provider_factory: Callable[[str,
         if not isinstance(schema_url, str):
             raise BadRequestErr("Invalid schemaUrl datatype")
         try:
-            schema = await schema_repository.get_async(schema_url)
+            url_segments = context.url_segments
+            rkey = url_segments.rkey
+            culture = url_segments.culture
+            schema = await schema_repository.get_async(schema_url, rkey, culture)
         except Exception as ex:
             print(repr(ex))
             raise ValueError("Invalid schemaUrl")

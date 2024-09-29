@@ -23,8 +23,8 @@ class ApiProvider(IProvider[ApiImportData, ApiExportData]):
     def _create_export_data(self, data: Dict) -> ApiExportData:
         return super()._create_export_data(data)
 
-    def _export_schema(self, export_data: ApiExportData) -> List[ObjectProperties]:
-        return super()._export_schema(export_data)          
+    async def _export_schema_async(self, export_data: ApiExportData) -> List[ObjectProperties]:
+        return await super()._export_schema_async(export_data)          
 
     async def _import_schema_async(self, properties: List[ObjectProperties], import_data: ApiImportData):
         async with aiohttp.ClientSession() as session:
