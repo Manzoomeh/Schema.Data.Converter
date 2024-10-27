@@ -9,7 +9,6 @@ import pandas
 class ExcelExportData(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     file_path: str
-    name: str
     headers: List[str] = [
         "property",
         "part"
@@ -17,7 +16,7 @@ class ExcelExportData(BaseModel):
 
     @field_validator("file_path")
     def check_file_path(cls, value: str):
-        if not Path(value).is_dir():
+        if not Path(value).is_file():
             raise ValueError("Invalid file path")
         return value
     
@@ -34,16 +33,10 @@ class ExcelExportData(BaseModel):
             ret_val.append("part")
 
         return ret_val
-    
-    @model_validator(mode="after")
-    def check_file_is_exist(self):
-        if not self.io.is_file():
-            raise ValueError("Source file not found")
-        return self
         
     @property
     def io(self):
-        return Path(self.file_path).joinpath(self.name)
+        return Path(self.file_path)
 
 class ExcelImportData(BaseModel): ...
 
@@ -86,7 +79,7 @@ class ExcelProvider(IProvider[ExcelImportData, ExcelExportData]):
                 col_data[headers[index]] = title
             named_col = self.__get_named_col(col_data)
             if named_col is None:
-                raise ProviderError("Invalid columns")
+                raise ProviderError(f"Invalid columns => {col_data}")
                 
             raw_columns.append(named_col)
         df.columns = raw_columns
@@ -102,24 +95,33 @@ class ExcelProvider(IProvider[ExcelImportData, ExcelExportData]):
             for col in df.columns[1:]:
                 col_val = row[col]
                 if pandas.notna(col_val):
-                    prpid, part = col.split("_")
-                    prpid = int(prpid)
-                    part = int(part)
-                    if prpid not in prpvalues:
-                        prpvalues[prpid] = ObjectPrpValue(
-                            prp=self._properties[prpid],
-                            values=[]
+                    if col.startswith("#property#"):
+                        prpid, part = col.removeprefix("#property#").split("_")
+                        prpid = int(prpid)
+                        part = int(part)
+                        if prpid not in prpvalues:
+                            prpvalues[prpid] = ObjectPrpValue(
+                                prp=self._properties[prpid],
+                                values=[]
+                            )
+                        prpvalues[prpid].values.append(
+                            ObjectValue(
+                                part=part,
+                                value=col_val
+                            )
                         )
-                    prpvalues[prpid].values.append(
-                        ObjectValue(
-                            part=part,
-                            value=col_val
+                    elif col.startswith("#belong#"):
+                        blgid = int(col.removeprefix("#belong#"))
+                        objects_properties[selected_id].belongsData.append(
+                            {
+                                "blgid": blgid,
+                                self._belong_properties[blgid].target_table: col_val
+                            }
                         )
-                    )
             try:
                 await objects_properties[selected_id].add_prpvalue_async(list(prpvalues.values()))
             except Exception as ex:
-                print(f"[Warning] row={index} has error! Info: {str(ex)}")
+                print(f"[Warning] row={index} has error! Row: {row} Info: {str(ex)}")
 
         return list(objects_properties.values())
 
@@ -133,5 +135,7 @@ class ExcelProvider(IProvider[ExcelImportData, ExcelExportData]):
                             part = p.Id
                 else:
                     part = 1
-                return f"{prpid}_{part}"
-    
+                return f"#property#{prpid}_{part}"
+        for blgid, blg in self._belong_properties.items():
+            if col_data["property"] == blg.title:
+                return f"#belong#{blgid}"

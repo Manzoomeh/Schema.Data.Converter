@@ -28,7 +28,8 @@ class ObjectPrpValue(BaseModel):
 class ObjectProperties:
     def __init__(self) -> None:
         self.data = dict()
-        self.__autocomplete_repo: Dict[Part, Dict[str, int]] = dict()
+        self.__autocomplete_repo: Dict[(int, int), Dict[str, int]] = dict()
+        self.belongsData = list()
 
     async def add_prpvalue_async(self, prpvalues: List[ObjectPrpValue]):
         for prpvalue in prpvalues:
@@ -58,11 +59,11 @@ class ObjectProperties:
                     if selected_id is None:
                         raise Exception(f"Invalid value for prpId={prpid} and part={input_part}. Info: [value='{input_value}' not found in fixvalues]")
                     input_value = selected_id
-                elif part_datatype in (DataType.URL_VALUE):
+                elif part_datatype == DataType.URL_VALUE:
                     # GET FROM LINK ( --- DEPENDENCIES ???)
-                    if selected_part not in self.__autocomplete_repo:
-                        self.__autocomplete_repo[selected_part] = dict()
-                    part_repo = self.__autocomplete_repo[selected_part]
+                    if (prpid, selected_part.Id) not in self.__autocomplete_repo:
+                        self.__autocomplete_repo[(prpid, selected_part.Id)] = dict()
+                    part_repo = self.__autocomplete_repo[(prpid, selected_part.Id)]
                     if input_value not in part_repo:
                         autocomplete_id = await get_autocomplete_id_async(selected_part.link, input_value)
                         if autocomplete_id is None:

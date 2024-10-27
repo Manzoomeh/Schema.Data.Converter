@@ -33,7 +33,10 @@ options = {
     "server": f"{HOST}:{PORT}",
     "router": "restful",
     "log_error": log_error,
-    "log_request": log_request
+    "log_request": log_request,
+    "settings": {
+        "connections.rest.check_rkey": "https://api.trust-login.com/checkrkey",
+    }
 }
 
 loop = asyncio.new_event_loop()

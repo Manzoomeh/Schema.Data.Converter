@@ -37,7 +37,8 @@ class ApiProvider(IProvider[ApiImportData, ApiExportData]):
                         "properties": list(obj_properties.data.values()),
                         "schemaId": self._schema_hashid,
                         "schemaVersion": self._schema_version
-                    }
+                    },
+                    "belongData": obj_properties.belongsData
                 })
                 print(copy_body)
                 async with session.post(url=import_data.url, json=copy_body) as req:

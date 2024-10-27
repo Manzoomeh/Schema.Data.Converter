@@ -21,6 +21,7 @@ async def check_rkey_async(context: RESTfulContext):
             "errorid": 1,
             "message": "Invalid rkey!"
         })
+    return True
 
 @inject
 async def import_async(context: RESTfulContext, provider_factory: Callable[[str, List[Property]], IProvider] = Provider["provider_factory"], schema_repository: SchemaRepository = Provide["schema_repo"]):
@@ -84,7 +85,7 @@ async def import_async(context: RESTfulContext, provider_factory: Callable[[str,
                 "data": dest_data
             }
         try:
-            answers = source_provider.export_schema(source_data)
+            answers = await source_provider.export_schema_async(source_data)
         except ProviderError as ex:
             raise BadRequestErr(message=repr(ex))
         result = list()

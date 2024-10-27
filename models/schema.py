@@ -1,7 +1,17 @@
 from typing import Dict, Any, List, Optional
 from models.questions import Property, Part, DataType, FixValue, Section
 import aiohttp
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+@dataclass
+class BelongProperties:
+    title: str
+    blgid: int
+    target_tableId: int
+
+    @property
+    def target_table(self):
+        return f"table{self.target_tableId}id"
 
 @dataclass
 class Schema:
@@ -10,6 +20,7 @@ class Schema:
     hashid: str
     version: str
     properties: Dict[int, Property]
+    belong_properties: Dict[int, BelongProperties]
 
 async def get_fixes_from_link_async(url: str):
     async with aiohttp.ClientSession() as session:
@@ -58,22 +69,59 @@ class SchemaRepository:
             result = DataType.REFERENCE
         return result
 
+    async def __get_related_belong_properties(self, hashid: str, culture: str):
+        db = {
+            "0BEFA5E8-57F7-4B99-ABAE-5758A7346502": [
+                {
+                    "blgid": 7,
+                    "target_table": 2,
+                    "title": "line" if culture != "fa" else "لاین"
+                },
+                {
+                    "blgid": 17,
+                    "target_table": 2,
+                    "title": "customerId" if culture != "fa" else "آی دی مشتری"
+                }
+            ],
+            "6C16F85C-8B68-4264-85BB-FAF7FF723E54": [
+                {
+                    "blgid": 7,
+                    "target_table": 2,
+                    "title": "line" if culture != "fa" else "لاین"
+                },
+                {
+                    "blgid": 16,
+                    "target_table": 2,
+                    "title": "customerId" if culture != "fa" else "آی دی مشتری"
+                }
+            ],
+        }
+        return {
+            int(blg["blgid"]): BelongProperties(
+                title=blg["title"],
+                blgid=int(blg["blgid"]),
+                target_tableId=int(blg["target_table"])
+            )
+            for blg in db.get(hashid, list)
+        }
+
     async def __route_schema_async(self, url: str, rkey: str, culture: str):
+        print(f"Route schema from url: {url}")
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as req:
                 resp = await req.json()
         if not SchemaRepository.is_schema_base(resp):
-            raise Exception("Invalid schemaUrl")
+            raise Exception(f"Invalid response from url: {resp}")
         schema_data = resp["sources"][0]["data"][0]
         hashid = schema_data["schemaId"]
         param_url = schema_data["paramUrl"]
         version = schema_data["schemaVersion"]
         questions: List[Dict] = schema_data.get("questions", list())
+        belong_properties = await self.__get_related_belong_properties(hashid, culture)
         sections: Dict[int, str] = {
             sec["id"]: sec["title"]
             for sec in schema_data.get("sections", list())
         }
-
         properties: Dict[int, Property] = dict()
         for q in questions:
             prp_id = int(q["prpId"])
@@ -88,7 +136,7 @@ class SchemaRepository:
                 if data_type is None:
                     print("[Warning]", f"Datatype not set for prpId={prp_id} and partId={part_id}")
                 if data_type == DataType.FIX_VALUE:
-                    if link is not None:
+                    if link != "":
                         fix_values = await get_fixes_from_link_async(link)
                     else:
                         fix_values = [
@@ -119,7 +167,8 @@ class SchemaRepository:
             paramUrl=param_url,
             version=version,
             hashid=hashid,
-            properties=properties
+            properties=properties,
+            belong_properties=belong_properties
         )
 
     @staticmethod
